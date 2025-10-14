@@ -1,8 +1,9 @@
 # UniSAI: AI-Friendly Unity Scene Analyzer
 
-![PNG](preview0.png) 
 ![PNG](preview1.png) 
-![PNG](preview2.png) 
+
+
+![PNG](preview0.png) 
 
 ## What is UniSAI?
 
