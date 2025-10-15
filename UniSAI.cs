@@ -121,6 +121,51 @@ public static class UniSAI
             add(type.Name);
             var eventFields = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                                   .Where(f => typeof(UnityEngine.Events.UnityEventBase).IsAssignableFrom(f.FieldType));
+            // Collect serialized ObjectReference fields (minimal): field name and target identifier (GUID or names)
+            try
+            {
+                var so = new SerializedObject(c);
+                var prop = so.GetIterator();
+                if (prop.NextVisible(true))
+                {
+                    do
+                    {
+                        if (prop.propertyType == SerializedPropertyType.ObjectReference)
+                        {
+                            add(prop.name);
+                            var obj = prop.objectReferenceValue;
+                            if (obj != null)
+                            {
+                                try
+                                {
+                                    var path = AssetDatabase.GetAssetPath(obj);
+                                    if (!string.IsNullOrEmpty(path))
+                                    {
+                                        var guid = AssetDatabase.AssetPathToGUID(path);
+                                        add(guid);
+                                    }
+                                    else if (obj is Component compTarget)
+                                    {
+                                        add(compTarget.gameObject.name);
+                                        add(compTarget.GetType().Name);
+                                    }
+                                    else if (obj is GameObject goTarget)
+                                    {
+                                        add(goTarget.name);
+                                    }
+                                    else
+                                    {
+                                        add(obj.GetType().Name);
+                                    }
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                    while (prop.NextVisible(false));
+                }
+            }
+            catch { }
             foreach (var f in eventFields)
             {
                 add(f.Name);
@@ -257,6 +302,76 @@ public static class UniSAI
                 }
                 sb.Append("]}");
             }
+
+            // Minimal: collect serialized ObjectReference fields and append compact refs if any
+            try
+            {
+                var so = new SerializedObject(c);
+                var prop = so.GetIterator();
+                var refs = new List<string>();
+                if (prop.NextVisible(true))
+                {
+                    do
+                    {
+                        if (prop.propertyType == SerializedPropertyType.ObjectReference)
+                        {
+                            var obj = prop.objectReferenceValue;
+                            if (obj == null) continue;
+
+                            int fieldIdx = GetIdx(prop.name);
+                            int targetIdx = -1;
+                            int meta = 0; // 0=scene-object,1=asset,2=component
+
+                            try
+                            {
+                                var path = AssetDatabase.GetAssetPath(obj);
+                                if (!string.IsNullOrEmpty(path))
+                                {
+                                    var guid = AssetDatabase.AssetPathToGUID(path);
+                                    targetIdx = GetIdx(guid);
+                                    meta = 1;
+                                }
+                                else if (obj is Component compTarget)
+                                {
+                                    targetIdx = GetIdx(compTarget.gameObject.name);
+                                    meta = 2;
+                                }
+                                else if (obj is GameObject goTarget)
+                                {
+                                    targetIdx = GetIdx(goTarget.name);
+                                    meta = 0;
+                                }
+                                else
+                                {
+                                    targetIdx = GetIdx(obj.GetType().Name);
+                                    meta = 1;
+                                }
+                            }
+                            catch { targetIdx = -1; }
+
+                            // only record if we have a valid target symbol
+                            if (fieldIdx >= 0 && targetIdx >= 0)
+                            {
+                                refs.Add($"[{fieldIdx},{targetIdx},{meta}]");
+                            }
+                        }
+                    }
+                    while (prop.NextVisible(false));
+                }
+
+                if (refs.Count > 0)
+                {
+                    sb.Append(',');
+                    sb.Append("\"r\":[");
+                    for (int i = 0; i < refs.Count; i++)
+                    {
+                        if (i > 0) sb.Append(',');
+                        sb.Append(refs[i]);
+                    }
+                    sb.Append(']');
+                }
+            }
+            catch { }
         }
         sb.Append(']').Append(',');
 
