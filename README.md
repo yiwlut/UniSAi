@@ -32,4 +32,4 @@ It's a powerful tool that helps AI understand your entire scene. UniSAI analyzes
 
 ## Known Issues
 
-big context, big Scene not tested
+
